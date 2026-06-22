@@ -67,16 +67,16 @@ public class SecurityConfig {
     /**
      * CORS for local development.
      *
-     * NOTE FOR CLASS: there is no setAllowCredentials(true) here yet. Cookies
-     * will NOT cross origin until we add it (together with the exact origin,
-     * never "*"). That's one of the changes we make live in the lesson.
+     * Cookies need credentials enabled for browser requests from localhost:3000.
+     * Because credentials are enabled, the origin must be explicit, not "*".
      */
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
         config.setAllowedOrigins(List.of("http://localhost:3000"));
-        config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE"));
+        config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("Content-Type", "Authorization"));
+        config.setAllowCredentials(true);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", config);

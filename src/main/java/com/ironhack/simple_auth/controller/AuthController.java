@@ -1,5 +1,9 @@
 package com.ironhack.simple_auth.controller;
 
+import java.time.Duration;
+
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -28,7 +32,7 @@ public class AuthController {
         this.jwtTokenProvider = jwtTokenProvider;
     }
 
-    /** Public: register a new user, then hand back a token (in the body, for now). */
+    /** Public: register a new user, then hand back a token in the body. */
     @PostMapping("/signup")
     public ResponseEntity<AuthResponse> signup(@RequestBody SignupRequest request) {
         User user = authService.signup(request);
@@ -37,14 +41,25 @@ public class AuthController {
     }
 
     /**
-     * Public: validate credentials and return a JWT
-     * TODO: move it into an httpOnly cookie via ResponseCookie + the Set-Cookie header, and the body will carry only the UserDto.
+     * Public: validate credentials and send the JWT in an httpOnly cookie.
+     * The response body contains only the logged-in user data.
      */
     @PostMapping("/login")
-    public ResponseEntity<AuthResponse> login(@RequestBody LoginRequest request) {
+    public ResponseEntity<UserDto> login(@RequestBody LoginRequest request) {
         User user = authService.authenticate(request.email(), request.password());
         String jwt = jwtTokenProvider.createToken(user);
-        return ResponseEntity.ok(new AuthResponse(UserDto.from(user), jwt));
+
+        ResponseCookie cookie = ResponseCookie.from("token", jwt)
+                .httpOnly(true)
+                .secure(false) // keep false for local http://localhost testing
+                .path("/")
+                .sameSite("Lax")
+                .maxAge(Duration.ofHours(1))
+                .build();
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.SET_COOKIE, cookie.toString())
+                .body(UserDto.from(user));
     }
 
     /** Protected: returns the currently authenticated user. */
@@ -53,14 +68,19 @@ public class AuthController {
         return ResponseEntity.ok(UserDto.from(user));
     }
 
-    /**
-     * Protected: logout.
-     * With a token-in-the-body model there is nothing to clear server-side —
-     * the client just discards its token. In class this becomes the place where
-     * we expire the httpOnly cookie (ResponseCookie ... maxAge(0)).
-     */
+    /** Protected: logout by expiring the JWT cookie in the browser/Postman. */
     @PostMapping("/logout")
     public ResponseEntity<Void> logout() {
-        return ResponseEntity.ok().build();
+        ResponseCookie cookie = ResponseCookie.from("token", "")
+                .httpOnly(true)
+                .secure(false) // keep false for local http://localhost testing
+                .path("/")
+                .sameSite("Lax")
+                .maxAge(0)
+                .build();
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.SET_COOKIE, cookie.toString())
+                .build();
     }
 }
